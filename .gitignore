@@ -59,3 +59,6 @@ bin/*
 .bash/
 bin/bootstrap
 bin/lib-bash
+
+# vscode settings
+.vscode

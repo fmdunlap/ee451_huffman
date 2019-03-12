@@ -4,13 +4,6 @@
 
 #include "serial.h"
 
-DivisionResult Division::divide() {
-  if (fraction.denominator == 0L) throw DivisionByZero();
-
-  DivisionResult result = DivisionResult{
-    fraction.numerator / fraction.denominator, 
-    fraction.numerator % fraction.denominator
-  };
-
-  return result;
+int HuffmanSerial::run(/* File location? Bitstream? TBD */) {
+  return 0;
 }

@@ -2,51 +2,26 @@
 // Created by Konstantin Gredeskoul on 5/14/17.
 //
 
-#ifndef CMAKE_DIVISION_H
-#define CMAKE_DIVISION_H
+#ifndef CMAKE_SERIAL_H
+#define CMAKE_SERIAL_H
 
-static const char *const DIVISION_BY_ZERO_MESSAGE = "Division by zero is illegal";
+static const char *const MISSING_SOURCE_FILE_MESSAGE = "Your source file is missing!";
+static const char *const MISSING_DEST_FILE_MESSAGE = "Your destination file is missing!";
 
 #include <iostream>
 #include <stdexcept>
 
 using namespace std;
 
-class DivisionByZero : public exception {
+class HuffmanSerial {
 public:
-  virtual const char *what() const throw() {
-    return DIVISION_BY_ZERO_MESSAGE;
-  }
-};
-
-struct Fraction {
-  long long numerator;
-  long long denominator;
-};
-
-struct DivisionResult {
-  long long division;
-  long long remainder;
-
-  friend bool operator==(const DivisionResult &lhs, const DivisionResult &rhs) {
-    return lhs.division == rhs.division ? lhs.remainder < rhs.remainder : lhs.division < rhs.division;
-  }
-};
-
-class Division {
-public:
-  explicit Division(Fraction fraction) {
-    this->fraction = fraction;
+  explicit HuffmanSerial() {
   }
 
-  ~Division() {
+  ~HuffmanSerial() {
   };
 
-  DivisionResult divide();
-
-protected:
-  Fraction       fraction;
-  DivisionResult result;
+  int run();
 };
 
-#endif //CMAKE_DIVISION_H
+#endif //CMAKE_SERIAL_H

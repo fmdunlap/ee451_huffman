@@ -5,8 +5,8 @@
 #ifndef PROJECT_MAIN_H
 #define PROJECT_MAIN_H
 
-static const char *const HEADER = "\nDivider © 2018 Monkey Claps Inc.\n\n";
-static const char *const USAGE = "Usage:\n\tdivider <numerator> <denominator>\n\nDescription:\n\tComputes the result of a fractional division,\n\tand reports both the result and the remainder.\n";
+static const char *const HEADER = "\nHuffman © 2019 Dunlap, Ko, Ramesh\n\n";
+static const char *const USAGE = "Usage:\n\tTBD\n\nDescription:\n\tCompresses a given file using Huffman coding,\n\tand stores the result.\n";
 
 
 #endif //PROJECT_MAIN_H
