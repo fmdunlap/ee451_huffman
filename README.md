@@ -16,7 +16,7 @@ You will need:
 
  * A modern C/C++ compiler
  * CMake 3.1+ installed (on a Mac, run `brew install cmake`)
- * If you prefer to code in a great IDE, I highly recommend [Jetbrains CLion](https://www.jetbrains.com/clion/). It is fully compatible with this project.
+ * If you need a text editor, I HIGHLY recommend [VSCode](https://code.visualstudio.com/).
 
 ### Building The Project
 
