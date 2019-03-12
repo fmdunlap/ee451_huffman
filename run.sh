@@ -24,7 +24,7 @@ export LibBashRepo="https://github.com/kigster/lib-bash"
 
 # We are using an awesome BASH library `lib-bash` for prettifying the output, and
 # running commands through their LibRun framework.
-divider::lib-bash() {
+huffman::lib-bash() {
   [[ ! -d ${BashLibRoot} ]] && curl -fsSL https://git.io/fxZSi | /usr/bin/env bash
   [[ ! -d ${BashLibRoot} ]] && { 
     printf "Unable to git clone lib-bash repo from ${LibBashRepo}"
@@ -45,7 +45,7 @@ divider::lib-bash() {
   run::set-all show-output-off abort-on-error
 }
 
-divider::header() {
+huffman::header() {
   h1::purple "Fractional Division With Remainder: A CMake Project Template with Tests"
   local OIFC=${IFC}
   IFS="|" read -r -a gcc_info <<< "$(gcc --version 2>&1 | tr '\n' '|')"
@@ -55,19 +55,19 @@ divider::header() {
   h1 "${bldylw}CMAKE:  ${bldblu}$(cmake --version | tr '\n' ' ')"
 }
 
-divider::setup() {
+huffman::setup() {
   hl::subtle "Creating Build Folder..."
   run "mkdir -p build/run"
 
   [[ -f .idea/workspace.xml ]] || cp .idea/workspace.xml.example .idea/workspace.xml
 }
 
-divider::clean() {
+huffman::clean() {
   hl::subtle "Cleaning output folders..."
   run 'rm -rf bin/d* include/d* lib/*'
 }
 
-divider::build() {
+huffman::build() {
   run "cd build/run"
   run "cmake ../.. "
   run "make -j 12"
@@ -75,41 +75,40 @@ divider::build() {
   run "cd ${ProjectRoot}"
 }
 
-divider::tests() {
-  if [[ -f bin/divider_tests ]]; then
+huffman::tests() {
+  if [[ -f bin/serial_tests ]]; then
     run::set-next show-output-on
-    run "echo && bin/divider_tests"
+    run "echo && bin/serial_tests"
   else
-    printf "${bldred}Can't find installed executable ${bldylw}bin/divider_tests.${clr}\n"
+    printf "${bldred}Can't find installed executable ${bldylw}bin/serial_tests.${clr}\n"
     exit 2
   fi
 }
 
-divider::examples() {
-  [[ ! -f bin/divider ]] && {
-    error "You don't have the cmpiled binary yet".
+huffman::examples() {
+  [[ ! -f bin/huffman ]] && {
+    error "You don't have the compiled binary yet".
     exit 3
   }
 
   run::set-all show-output-on
 
   hr
-  run "bin/divider 11 7"
+  run "bin/huffman"
   hr
-  run "bin/divider 1298798375 94759897"
-  hr
-  run "bin/divider 78 17"
-  hr
-
 }
 
 main() {
-  divider::lib-bash
-  divider::header
-  divider::setup
-  divider::build
-  divider::tests
-  divider::examples
+  huffman::lib-bash
+  huffman::header
+  huffman::setup
+  huffman::build
+  # Note, WE CAN AND SHOULD RUN TESTS HERE.
+  # Currently, we don't have any relevant tests, soooo
+  # those are things we should add in the future.
+  # To run them here simply uncomment the following lines:
+  # huffman::tests
+  # huffman::examples
 }
 
 (( $_s_ )) || main
