@@ -17,54 +17,43 @@ You will need:
  * A modern C/C++ compiler
  * CMake 3.1+ installed (on a Mac, run `brew install cmake`)
  * If you need a text editor, I HIGHLY recommend [VSCode](https://code.visualstudio.com/).
+ * RUBY ```bash sudo apt-get install ruby``` (Already installed on the USC HPC.) 
+ * Mpich ```bash sudo apt-get install mpich``` (Already installed on the USC HPC.) 
+ * Realpath ```bash sudo apt-get install realpath``` (Already installed on the USC HPC.) 
 
 ### Building The Project
 
-#### Project Structure
+####  Building Using the Script
 
-There are three empty folders: `lib`, `bin`, and `include`. Those are populated by `make install`.
+I built a handy BASH script that you can use to build the project. It's a bit complicated, so I highly recommend using this.
 
-The rest should be obvious: `src` is the sources, and `test` is where we put our unit tests.
-
-Now we can build this project, and below we show three separate ways to do so.
+```bash
+./build.sh
+```
 
 #### Building Manually
 
-```bash
-$ rm -rf build/manual && mkdir build/manual
-$ cd build/manual
-$ cmake ../..
-$ make && make install
-$ cd ../..
+Plz just don't build manually.
 
-# Run the tests:
-$ bin/divider_tests 
+### Running the Project
 
-# Run the binary:
-$ bin/divider 234 5431
-```
+Similar to the build script, I put together a handy-dandy run script. This formats your command to be usable by the C program, and keeps things (somewhat) portable. Plus, I really like how pretty lib-bash makes things
 
-####  Building Using the Script
-
-There is a handy BASH script (used by the Travis CI) that you can run locally. It builds the project, and runs all the tests
+Options:
+ * -n/--numprocs - Sets number of processes.
+ * -t/--type - Sets the program to run in (s)erial or (p)arallel.
+ * -o/--output - Sets the location of the output file.
+ * -s/--srun - Whether to use srun or not. Setting this means you are using srun.
 
 ```bash
-./run.sh
+./run.sh [-n/--numprocs] \<\#\> [-t/--type] \<s or p\> [-o/--output] \<./out/file/location\> [-s/--srun] ./fileToCompress
 ```
+
 
 ## File Locations
 
  * `src/*` — C++ code that ultimately compiles into a library
- * `test/lib` — C++ libraries used for tests (eg, Google Test)
- * `test/src` — C++ test suite
  * `bin/`, `lib`, `include` are all empty directories, until the `make install` install the project artifacts there.
-
-Tests:
-
- * A `test` folder with the automated tests and fixtures that mimics the directory structure of `src`.
- * For every C++ file in `src/A/B/<name>.cpp` there is a corresponding test file `test/A/B/<name>_test.cpp`
- * Tests compile into a single binary `test/bin/runner` that is run on a command line to run the tests.
- * `test/lib` folder with a git submodule in `test/lib/googletest`, and possibly other libraries.
 
 ### Acknowledgements
 
