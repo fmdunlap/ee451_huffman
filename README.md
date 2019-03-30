@@ -46,7 +46,7 @@ Options:
  * -s/--srun - Whether to use srun or not. Setting this means you are using srun.
 
 ```bash
-./run.sh [-n/--numprocs] \<\#\> [-t/--type] \<s or p\> [-o/--output] \<./out/file/location\> [-s/--srun] ./fileToCompress
+./run.sh [-n/--numprocs] <#> [-t/--type] <s or p> [-o/--output] <./out/file/location> [-s/--srun] ./fileToCompress
 ```
 
 
