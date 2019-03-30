@@ -1,9 +1,24 @@
 cmake_minimum_required(VERSION 3.2)
 project(huffman)
 
-add_subdirectory(serial)
-set(SOURCE_FILES main.cpp)
+# add_subdirectory(fileio)
+SET(SOURCE_FILES 
+  main.c
+  ./fileio/fileio.h
+  ./fileio/fileio.c        
+)
 
 add_executable(huffman ${SOURCE_FILES})
-target_link_libraries(huffman serial)
-install(TARGETS huffman DESTINATION ${HUFFMAN_INSTALL_BIN_DIR})
+target_link_libraries(huffman ${MPI_LIBRARIES})
+
+if(MPI_COMPILE_FLAGS)
+  set_target_properties(huffman PROPERTIES
+    COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+endif()
+
+if(MPI_LINK_FLAGS)
+  set_target_properties(huffman PROPERTIES
+    LINK_FLAGS "${MPI_LINK_FLAGS}")
+endif()
+
+install(TARGETS huffman DESTINATION ${PROJECT_INSTALL_BIN_DIR})

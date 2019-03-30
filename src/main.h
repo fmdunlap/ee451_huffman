@@ -1,12 +1,23 @@
-//
-// Created by Konstantin Gredeskoul on 10/7/18.
-//
+#ifndef MAIN_HEADER
+#define MAIN_HEADER
 
-#ifndef PROJECT_MAIN_H
-#define PROJECT_MAIN_H
+#include <stdbool.h>
 
-static const char *const HEADER = "\nHuffman © 2019 Dunlap, Ko, Ramesh\n\n";
-static const char *const USAGE = "Usage:\n\tTBD\n\nDescription:\n\tCompresses a given file using Huffman coding,\n\tand stores the result.\n";
+    // CONST SETTINGS
+    const int TYPE_SERIAL = 0;
+    const int TYPE_PARALLEL = 1;
+
+    // RUNTIME SETTINGS
+    char* inputFileName;      
+    int runType;
+
+    // MPI VARIABLES
+    bool master;
+    int numProcs;
+    int rank;
 
 
-#endif //PROJECT_MAIN_H
+    void parseArgs(char**);
+    void setupMpiVars();
+
+#endif

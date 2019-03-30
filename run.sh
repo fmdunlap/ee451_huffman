@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-#
-# © 2018 Konstantin Gredeskoul, All Rights Reserved.
-# MIT License
-#
-# WARNING: This BASH script is completely optional. You don't need it to build this project.
-#
-# If you choose to run this script to build the project, run:
-#
-#     $ ./run.sh
-#
-# It will clean, build and run the tests.
-#
-#
 
 ( [[ -n ${ZSH_EVAL_CONTEXT} && ${ZSH_EVAL_CONTEXT} =~ :file$ ]] || \
   [[ -n $BASH_VERSION && $0 != "$BASH_SOURCE" ]]) && _s_=1 || _s_=0
@@ -22,93 +9,115 @@ export BuildDir="${ProjectRoot}/build/run"
 export BashLibRoot="${ProjectRoot}/bin/lib-bash"
 export LibBashRepo="https://github.com/kigster/lib-bash"
 
+export DEFAULT_N_PROCS=4
+export DEFAULT_TYPE=s
+export DEFAULT_OUTPUT_FILE=./out
+
 # We are using an awesome BASH library `lib-bash` for prettifying the output, and
 # running commands through their LibRun framework.
 huffman::lib-bash() {
-  [[ ! -d ${BashLibRoot} ]] && curl -fsSL https://git.io/fxZSi | /usr/bin/env bash
-  [[ ! -d ${BashLibRoot} ]] && { 
-    printf "Unable to git clone lib-bash repo from ${LibBashRepo}"
-    exit 1
-  }
-  
-  if [[ -f ${BashLibRoot}/Loader.bash ]]; then
-    cd ${BashLibRoot} > /dev/null
-    git reset --hard origin/master 2>&1 | cat >/dev/null
-    git pull 2>&1 | cat >/dev/null
-    [[ -f Loader.bash ]] && source Loader.bash
-    cd ${ProjectRoot}
-  else
-    printf "\nERROR: unable to find lib-bash library from ${LibBashRepo}!\n"
-    exit 1
+  if [ ! -d "./.lib-bash" ]; then 
+    git clone https://github.com/pioneerworks/lib-bash .lib-bash
   fi
+  source .lib-bash/lib/Loader.bash
 
   run::set-all show-output-off abort-on-error
 }
 
-huffman::header() {
-  h1::purple "Fractional Division With Remainder: A CMake Project Template with Tests"
-  local OIFC=${IFC}
-  IFS="|" read -r -a gcc_info <<< "$(gcc --version 2>&1 | tr '\n' '|')"
-  export IFC=${OIFC}
-  h1 "${bldylw}GCC" "${gcc_info[1]}" "${gcc_info[2]}" "${gcc_info[3]}" "${gcc_info[4]}"
-  h1 "${bldylw}GIT:    ${bldblu}$(git --version)"
-  h1 "${bldylw}CMAKE:  ${bldblu}$(cmake --version | tr '\n' ' ')"
+huffman::parseargs(){
+    OPTIONS=n:t:o:s
+    LONGOPTS=numprocs,type,output,srun
+    
+    PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@")
+
+    eval set -- "$PARSED"
+
+    n=$DEFAULT_N_PROCS
+    t=$DEFAULT_TYPE
+    o=$DEFAULT_OUTPUT_FILE
+    s=n
+    inputFile=""
+
+    while true; do
+        case "$1" in
+            -n|--numprocs)
+                n="$2"
+                shift 2
+                ;;
+            -t|--type)
+                #Use tr to force lowercase
+                t=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+                shift 2
+                ;;
+            -o|--output)
+                o="$2"
+                shift 2
+                ;;
+            -s|--srun)
+                s=y
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                inf "Programming error"
+                not_ok:
+                exit 3
+                ;;
+        esac
+    done
+
+    # handle non-option arguments
+    if [[ $# -ne 1 ]]; then
+        inf "$0: A single input file is required."
+        not_ok:
+        exit 4
+    else
+        inputFile=$1
+    fi
+
 }
 
-huffman::setup() {
-  hl::subtle "Creating Build Folder..."
-  run "mkdir -p build/run"
+huffman::run() {
+    huffman::parseargs $@
+    h1 "Running..."
+    info "Input File: $inputFile"
+    info "Output File: $o"
+    info "Number of Processors: $n"
+    info "Execution type: $t"
+    info "Use srun? $s"
 
-  [[ -f .idea/workspace.xml ]] || cp .idea/workspace.xml.example .idea/workspace.xml
-}
+    if [ $s == "y" ]; then
+        executable="srun"
+        procarg="-n"
+    else
+        executable="mpirun"
+        procarg="-np"
+    fi
 
-huffman::clean() {
-  hl::subtle "Cleaning output folders..."
-  run 'rm -rf bin/d* include/d* lib/*'
-}
 
-huffman::build() {
-  run "cd build/run"
-  run "cmake ../.. "
-  run "make -j 12"
-  run "make install | egrep -v 'gmock|gtest'"
-  run "cd ${ProjectRoot}"
-}
-
-huffman::tests() {
-  if [[ -f bin/serial_tests ]]; then
-    run::set-next show-output-on
-    run "echo && bin/serial_tests"
-  else
-    printf "${bldred}Can't find installed executable ${bldylw}bin/serial_tests.${clr}\n"
-    exit 2
-  fi
-}
-
-huffman::examples() {
-  [[ ! -f bin/huffman ]] && {
-    error "You don't have the compiled binary yet".
-    exit 3
-  }
-
-  run::set-all show-output-on
-
-  hr
-  run "bin/huffman"
-  hr
+    if [ $t == "s" ] || [ $t == "serial" ]
+    then
+        h2 "RUN SERIAL VERSION"
+        run "$executable $procarg 1 ./bin/huffman s $inputFile > $o"
+    elif [ $t == "p" ] || [ $t == "parallel" ]
+    then
+        h2 "RUN PARALLEL VERSION"
+        run "$executable $procarg $n ./bin/huffman p $inputFile > $o"
+    elif [ $t == "d" ] || [ $t == "debug" ]
+    then
+        h2 "RUNNING DEBUG VERSION"
+        mpirun $procarg $n ./bin/huffman s $inputFile
+    else
+        h2 "TYPE DOES NOT EXIST"
+    fi
 }
 
 main() {
   huffman::lib-bash
-  huffman::header
-  huffman::setup
-  huffman::build
-  # Note, WE CAN AND SHOULD RUN TESTS HERE.
-  # Currently, we don't have any relevant tests, soooo
-  # those are things we should add in the future.
-  # To run them here simply uncomment the following lines:
-  # huffman::tests
-  # huffman::examples
+  huffman::run $@
 }
 
-(( $_s_ )) || main
+(( $_s_ )) || main $@
