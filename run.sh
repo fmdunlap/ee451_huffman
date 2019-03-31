@@ -75,7 +75,7 @@ huffman::parseargs(){
         not_ok:
         exit 4
     else
-        inputFile=$1
+        inputFile=$(realpath $1)
     fi
 
 }
@@ -109,7 +109,7 @@ huffman::run() {
     elif [ $t == "d" ] || [ $t == "debug" ]
     then
         h2 "RUNNING DEBUG VERSION"
-        mpirun $procarg $n ./bin/huffman s $inputFile
+        mpirun $procarg $n ./bin/huffman p $inputFile
     else
         h2 "TYPE DOES NOT EXIST"
     fi

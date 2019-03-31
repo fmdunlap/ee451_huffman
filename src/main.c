@@ -1,18 +1,18 @@
 #include "main.h"
-#include "./fileio/fileio.h"
+#include "./parallel/parallel.h"
+#include <string.h>
 #include <mpi.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 
 int main(int argc, char *argv[]) {
-    printf("Working like magic. \n");
     parseArgs(argv);
 
     MPI_Init(&argc, &argv);
     setupMpiVars();
 
-    
+    if(runType == TYPE_PARALLEL){
+        standardParallelSubroutine(rank, numProcs, inputFileName);
+    }
 
     MPI_Finalize();
     return 0;

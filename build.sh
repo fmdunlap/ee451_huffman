@@ -36,9 +36,9 @@ huffman::header() {
   local OIFC=${IFC}
   IFS="|" read -r -a gcc_info <<< "$(gcc --version 2>&1 | tr '\n' '|')"
   export IFC=${OIFC}
-  h1 "${bldylw}GCC" "${gcc_info[1]}" "${gcc_info[2]}" "${gcc_info[3]}" "${gcc_info[4]}"
-  h1 "${bldylw}GIT:    ${bldblu}$(git --version)"
-  h1 "${bldylw}CMAKE:  ${bldblu}$(cmake --version | tr '\n' ' ')"
+  # h1 "${bldylw}GCC" "${gcc_info[1]}" "${gcc_info[2]}" "${gcc_info[3]}" "${gcc_info[4]}"
+  # h1 "${bldylw}GIT:    ${bldblu}$(git --version)"
+  # h1 "${bldylw}CMAKE:  ${bldblu}$(cmake --version | tr '\n' ' ')"
 }
 # Note, I use the directory 'make' so that I can name this shell script build
 # without causing too much confusion.

@@ -3,10 +3,16 @@ project(huffman)
 
 # add_subdirectory(fileio)
 SET(SOURCE_FILES 
-  main.c
+  ./main.c
   ./fileio/fileio.h
-  ./fileio/fileio.c        
+  ./fileio/fileio.c
+  ./parallel/parallel.h
+  ./parallel/parallel.c  
+  ./hashmap/hashmap.h 
+  ./hashmap/hashmap.c 
 )
+
+SET(MPI_COMPILE_FLAGS -g)
 
 add_executable(huffman ${SOURCE_FILES})
 target_link_libraries(huffman ${MPI_LIBRARIES})
