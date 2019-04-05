@@ -14,11 +14,13 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         master.gather statistical data
         if(master){
             compute analytics
+            serialize analytics
         }
-        broadcast analytics
-        ~compress~
-        master.gather chunks
-        master.writeToDisk
+        broadcast serialized analytics
+        deserialize analytics // TODO
+        ~compress~ // TODO
+        master.gather chunks // TODO
+        master.writeToDisk // TODO
     */
 
     // Setup relevent variables.
