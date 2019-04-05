@@ -10,6 +10,7 @@ SET(SOURCE_FILES
   ./parallel/parallel.c  
   ./hashmap/hashmap.h 
   ./hashmap/hashmap.c 
+  ./huffbuild/huffbuild.h
 )
 
 SET(MPI_COMPILE_FLAGS -g)

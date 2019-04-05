@@ -1,4 +1,5 @@
 #include "./parallel.h"
+#include "../huffbuild/huffbuild.h"
 #include "../fileio/fileio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,14 +22,16 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     */
 
     // Setup relevent variables.
-        // Holder for number of byte occurences in a chunk.
-    long int occurences[256];
+    // Holder for number of byte occurrence in a chunk.
+    long int occurrence[256];
     for(int i = 0; i < 256; i++){
-        occurences[i] = 0;
+        occurrence[i] = 0;
     }
-    long int masterOccurences[256];
+
+    long int masterOccurrences[256];
+
     for(int i = 0; i < 256; i++){
-        masterOccurences[i] = 0;
+        masterOccurrences[i] = 0;
     }
     unsigned char* bigFile = NULL;
     long numBytes;
@@ -68,15 +71,33 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
                 MPI_COMM_WORLD);
 
     for(long int i = 0; i < sendCounts[rank]; i++){
-        occurences[(unsigned char)scatterRecv[i]]++;
+        occurrence[(unsigned char)scatterRecv[i]]++;
     }
 
-    MPI_Reduce(occurences, masterOccurences, 256, MPI_UNSIGNED_LONG, MPI_SUM, MASTER_RANK, MPI_COMM_WORLD);
-
-    if(rank == MASTER_RANK){
+    //MPI_UNSIGNED_LONG worked where char and int didn't??
+    MPI_Reduce(occurrence, masterOccurrences, 256, MPI_UNSIGNED_LONG, MPI_SUM, MASTER_RANK, MPI_COMM_WORLD);
+    //Now that we have the occurrences, let's clean them up a bit.
+    //How many of the values are non zero? These are small quick ops, so no mind that they're done serially.
+    if(rank==MASTER_RANK){
+        int dataSize = 0;
         for(int i = 0; i < 256; i++){
-            printf("%li\n", masterOccurences[i]);
+            if(masterOccurrences[i] != 0){
+                dataSize++;
+            }
+            // printf("%ld\n",masterOccurrences[i]);
         }
+        int* freq = malloc(sizeof(int)*dataSize);
+        char* data = malloc(sizeof(int)*dataSize);
+        int j = 0;
+        for(int i = 0; i < 256; i++){
+            if(masterOccurrences[i] != 0){
+                freq[j] = masterOccurrences[i];
+                data[j] = (char)i;
+                j++;
+            }
+        }
+        // printf("DataSize: %d \n", dataSize);
+        HuffmanCodes(data, freq, dataSize);
     }
 
 }
