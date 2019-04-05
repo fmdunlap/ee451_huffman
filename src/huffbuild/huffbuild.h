@@ -1,16 +1,27 @@
 // C program for Huffman Coding 
 #include <stdio.h> 
 #include <stdlib.h> 
+#include <stdbool.h>
 
 // This constant can be avoided by explicitly 
 // calculating height of Huffman Tree 
 #define MAX_TREE_HT 100 
 
+// I miss STL... :(
+int ZERO_SENT = 0;
+int ONE_SENT = 1;
+
 // A Huffman tree node 
+struct SerialNode{
+    unsigned char data;
+    unsigned freq;
+    bool null;
+};
+
 struct MinHeapNode { 
 
 	// One of the input characters 
-	char data; 
+	unsigned char data; 
 
 	// Frequency of the character 
 	unsigned freq; 
@@ -198,7 +209,7 @@ struct MinHeap* createAndBuildMinHeap(char data[], int freq[], int size)
 } 
 
 // The main function that builds Huffman tree 
-struct MinHeapNode* buildHuffmanTree(char data[], int freq[], int size) 
+struct MinHeapNode* buildHuffmanTree(char data[], int freq[], int size, struct MinHeap* minHeap) 
 
 { 
 	struct MinHeapNode *left, *right, *top; 
@@ -206,7 +217,7 @@ struct MinHeapNode* buildHuffmanTree(char data[], int freq[], int size)
 	// Step 1: Create a min heap of capacity 
 	// equal to size. Initially, there are 
 	// modes equal to size. 
-	struct MinHeap* minHeap = createAndBuildMinHeap(data, freq, size); 
+	minHeap = createAndBuildMinHeap(data, freq, size); 
 
 	// Iterate while size of heap doesn't become 1 
 	while (!isSizeOne(minHeap)) { 
@@ -274,8 +285,9 @@ void HuffmanCodes(char data[], int freq[], int size)
 
 { 
 	// Construct Huffman Tree 
+	struct MinHeap* mh = NULL;
 	struct MinHeapNode* root 
-		= buildHuffmanTree(data, freq, size); 
+		= buildHuffmanTree(data, freq, size, mh); 
 
 	// Print Huffman codes using 
 	// the Huffman tree built above 
@@ -284,16 +296,42 @@ void HuffmanCodes(char data[], int freq[], int size)
 	printCodes(root, arr, top); 
 } 
 
-// Driver program to test above functions 
-// int main() 
-// { 
+void calculateSerialSize(struct MinHeapNode* root, int* size, int sizePerNode){
+	*size += sizePerNode;
+	if(!root){
+		return;
+	}
+	calculateSerialSize(root->left, size, sizePerNode);
+	calculateSerialSize(root->right, size, sizePerNode);
+}
 
-// 	char arr[] = { 'a', 'b', 'c', 'd', 'e', 'f' }; 
-// 	int freq[] = { 5, 9, 12, 13, 16, 45 }; 
+// All nodes stored as 3 distinct serial ints. ['data','freq','null']
+// *data is value of the data for this node.
+// *freq is value of... the frequency for this node.
+// *null is a marker to signify that there's no node here. (Node is 
+//  null if val == 1)
+void serializeHelper(struct MinHeapNode* root, int* array, int* index){
+	// If current node is NULL, store marker 
+    if (root == NULL) 
+    {
+		array[*index] = 0;
+		array[*index+1] = 0;
+		array[*index+2] = 1;
+		*index += 3;
+        return; 
+    } 
+	
+	array[*index] = root->data;
+	array[*index+1] = root->freq;
+	array[*index+2] = 0;
+	*index += 3;
+    serializeHelper(root->left, array, index); 
+    serializeHelper(root->right, array, index); 
+}
 
-// 	int size = sizeof(arr) / sizeof(arr[0]); 
+//Returns the size of the serizlized array returned to array;
+void serialize(struct MinHeap* minHeap, struct MinHeapNode* root, int* array){
+	int index = 0;
+	serializeHelper(root, array, &index);
+}
 
-// 	HuffmanCodes(arr, freq, size); 
-
-// 	return 0; 
-// } 

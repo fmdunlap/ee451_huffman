@@ -79,12 +79,15 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     //Now that we have the occurrences, let's clean them up a bit.
     //How many of the values are non zero? These are small quick ops, so no mind that they're done serially.
     if(rank==MASTER_RANK){
+        struct MinHeap* minHeap = NULL;
+        struct MinHeapNode* huffmanRoot = NULL;
         int dataSize = 0;
+
+        // Prep data to be turned into a huffman tree.
         for(int i = 0; i < 256; i++){
             if(masterOccurrences[i] != 0){
                 dataSize++;
             }
-            // printf("%ld\n",masterOccurrences[i]);
         }
         int* freq = malloc(sizeof(int)*dataSize);
         char* data = malloc(sizeof(int)*dataSize);
@@ -96,8 +99,34 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
                 j++;
             }
         }
-        // printf("DataSize: %d \n", dataSize);
-        HuffmanCodes(data, freq, dataSize);
+        
+        //Build the tree and get the root.
+        huffmanRoot = buildHuffmanTree(data, freq, dataSize, minHeap);
+
+        // Get the serialized size of the tree. (Can't just use ->size b/c of
+        // differing tree encodings & need to record leaves.)
+        calculateSerialSize(huffmanRoot, &serialSize, 3); // 3 elements per node.
+
+        serialized = malloc(sizeof(int)*serialSize); 
+        serialize(minHeap, huffmanRoot, serialized);
+        // Now we have a serialized huffman tree to send out to all of the nodes! Hooray!
+        // We can also use this serialization to store the tree in the file later.
     }
+
+    MPI_Bcast(&serialSize, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
+    if(rank != MASTER_RANK){
+        serialized = malloc(sizeof(int)*serialSize);
+    }
+    MPI_Bcast(serialized, serialSize, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
+    printf("Rank: %d, SerialSize: %d\n", rank, serialSize);
+
+
+    //Share the huffman root with everyone.
+    /*  
+        Note: You might be thinking "OH GOD. IT'S A SHARED DATA STRUCTURE! 
+        WE NEED TO SYNCHRONIZE IT!" I know I was thinking that when I first
+        wrote this. But don't worry! ~None of the threads modify the tree.~
+     */
+    // MPI_Bcast(&huffmanRoot, 1, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
 
 }
