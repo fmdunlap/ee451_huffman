@@ -2,11 +2,18 @@
 
 ### Overview
 
-Hi, y'all! Here's the bones of our soon-to-be encryption project.
+Hi, y'all! Here's our work-in-progress compression project.
 
 Take a peak at the instructions below on how to build. I've already put some of the basics in, but not much.
 
 Source: I just modified an excellent template (https://github.com/kigster/cmake-project-template)
+
+## TODO
+* parallel.c
+  * ~compress~
+    * In this case, that means actually taking the bytes from the original file, and transforming them into to huffman bytes via some bitstream mechanism.
+  * master.gather_chunks
+  * master.writeToDisk
 
 ## Usage
 
