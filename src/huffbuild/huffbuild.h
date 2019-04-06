@@ -50,8 +50,7 @@ struct MinHeap {
 struct MinHeapNode* newNode(char data, unsigned freq) 
 { 
 	struct MinHeapNode* temp 
-		= (struct MinHeapNode*)malloc
-(sizeof(struct MinHeapNode)); 
+		= (struct MinHeapNode*) malloc(sizeof(struct MinHeapNode)); 
 
 	temp->left = temp->right = NULL; 
 	temp->data = data; 
@@ -253,14 +252,13 @@ void printCodes(struct MinHeapNode* root, int arr[], int top)
 
 { 
 
-	// Assign 0 to left edge and recur 
-	if (root->left) { 
-
-		arr[top] = 0; 
-		printCodes(root->left, arr, top + 1); 
+	// Assign 0 to left edge and recur
+	if (root->left) {
+		arr[top] = 0;
+		printCodes(root->left, arr, top + 1);
 	} 
 
-	// Assign 1 to right edge and recur 
+	// Assign 1 to right edge and recur
 	if (root->right) { 
 
 		arr[top] = 1; 
@@ -270,7 +268,7 @@ void printCodes(struct MinHeapNode* root, int arr[], int top)
 	// If this is a leaf node, then 
 	// it contains one of the input 
 	// characters, print the character 
-	// and its code from arr[] 
+	// and its code from arr[]
 	if (isLeaf(root)) { 
 
 		printf("%c: ", root->data); 
@@ -325,13 +323,42 @@ void serializeHelper(struct MinHeapNode* root, int* array, int* index){
 	array[*index+1] = root->freq;
 	array[*index+2] = 0;
 	*index += 3;
+	
     serializeHelper(root->left, array, index); 
     serializeHelper(root->right, array, index); 
 }
 
 //Returns the size of the serizlized array returned to array;
-void serialize(struct MinHeap* minHeap, struct MinHeapNode* root, int* array){
+void serialize(struct MinHeapNode* root, int* array){
 	int index = 0;
 	serializeHelper(root, array, &index);
 }
 
+// #PointerNightmare
+void deserializeHelper(struct MinHeapNode** root, int* array, int size, int* index){
+	unsigned char data = array[*index];
+	unsigned freq = array[*index+1];
+	int null = array[*index+2];
+
+	*index += 3;
+	if(null == 1 || *index == size - 1){
+		return;
+	}
+
+	*root = newNode(data, freq);
+	if(*index == 3){
+		printf("First address: %p \n", *root);
+	}
+	deserializeHelper(&((*root)->left), array, size, index);
+	deserializeHelper(&((*root)->right), array, size, index);
+}
+
+// assumption of 3 ints per node.
+struct MinHeapNode* deserialize(int* array, int size){
+	int index = 0;
+	struct MinHeapNode* root;
+	printf("Adress before helper: %p \n", root);
+	deserializeHelper(&root, array, size, &index);
+	printf("Adress after helper: %p \n", root);
+	return root;
+}

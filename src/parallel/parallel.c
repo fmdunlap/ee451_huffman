@@ -110,7 +110,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         calculateSerialSize(huffmanRoot, &serialSize, 3); // 3 elements per node.
 
         serialized = malloc(sizeof(int)*serialSize); 
-        serialize(minHeap, huffmanRoot, serialized);
+        serialize(huffmanRoot, serialized);
         // Now we have a serialized huffman tree to send out to all of the nodes! Hooray!
         // We can also use this serialization to store the tree in the file later.
     }
@@ -120,15 +120,17 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         serialized = malloc(sizeof(int)*serialSize);
     }
     MPI_Bcast(serialized, serialSize, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
-    printf("Rank: %d, SerialSize: %d\n", rank, serialSize);
 
+    // Uncomment to test deserialization.
+    // if(rank == 1){
+    //     struct MinHeapNode* localRoot = deserialize(serialized, serialSize);
+    //     int arr[MAX_TREE_HT], top = 0;
+    //     printCodes(localRoot, arr, top); 
+    // }
 
-    //Share the huffman root with everyone.
-    /*  
-        Note: You might be thinking "OH GOD. IT'S A SHARED DATA STRUCTURE! 
-        WE NEED TO SYNCHRONIZE IT!" I know I was thinking that when I first
-        wrote this. But don't worry! ~None of the threads modify the tree.~
-     */
-    // MPI_Bcast(&huffmanRoot, 1, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
+    // TODO: Encode the original file bytes
+    // TODO: send blocks to master
+    // TODO: merge blocks
+    // TODO: Flush blocks to disk.
 
 }

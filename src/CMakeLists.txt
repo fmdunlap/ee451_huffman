@@ -13,7 +13,7 @@ SET(SOURCE_FILES
   ./huffbuild/huffbuild.h
 )
 
-SET(MPI_COMPILE_FLAGS -g)
+SET(MPI_COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -g -Wall -Wextra")
 
 add_executable(huffman ${SOURCE_FILES})
 target_link_libraries(huffman ${MPI_LIBRARIES})
