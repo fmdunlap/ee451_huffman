@@ -61,8 +61,11 @@ bin/*
 bin/bootstrap
 bin/lib-bash
 
+# MISC
 .lib-bash
 testfiles
+hex
+test
 
 # vscode settings
 .vscode

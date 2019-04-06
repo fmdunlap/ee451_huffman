@@ -4,6 +4,7 @@ project(huffman)
 # add_subdirectory(fileio)
 SET(SOURCE_FILES 
   ./main.c
+  ./util.h
   ./fileio/fileio.h
   ./fileio/fileio.c
   ./parallel/parallel.h

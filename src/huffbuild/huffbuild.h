@@ -1,7 +1,9 @@
 // C program for Huffman Coding 
+#include "../util.h"
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <stdbool.h>
+#include <string.h>
 
 // This constant can be avoided by explicitly 
 // calculating height of Huffman Tree 
@@ -92,13 +94,13 @@ void swapMinHeapNode(struct MinHeapNode** a,
 } 
 
 // The standard minHeapify function. 
-void minHeapify(struct MinHeap* minHeap, int idx) 
+void minHeapify(struct MinHeap* minHeap,int idx) 
 
 { 
 
 	int smallest = idx; 
-	int left = 2 * idx + 1; 
-	int right = 2 * idx + 2; 
+	unsigned int left = 2 * idx + 1; 
+	unsigned int right = 2 * idx + 2; 
 
 	if (left < minHeap->size && minHeap->array[left]-> 
 freq < minHeap->array[smallest]->freq) 
@@ -248,10 +250,7 @@ struct MinHeapNode* buildHuffmanTree(char data[], int freq[], int size, struct M
 
 // Prints huffman codes from the root of Huffman Tree. 
 // It uses arr[] to store codes 
-void printCodes(struct MinHeapNode* root, int arr[], int top) 
-
-{ 
-
+void printCodes(struct MinHeapNode* root, int arr[], int top){ 
 	// Assign 0 to left edge and recur
 	if (root->left) {
 		arr[top] = 0;
@@ -274,7 +273,43 @@ void printCodes(struct MinHeapNode* root, int arr[], int top)
 		printf("%c: ", root->data); 
 		printArr(arr, top); 
 	} 
-} 
+}
+
+// Structurally the same as printCodes, we're just building and LUT this time.
+void LUTHelper(struct MinHeapNode* root, int arr[], int top, char*** LUT){
+	if (root->left) {
+		arr[top] = 0;
+		// &(*LUT) is a reference to the original pointer. All of these functions
+		// are pointer hell.
+		LUTHelper(root->left, arr, top + 1, &(*LUT)); 
+	} 
+	if (root->right) {
+		arr[top] = 1; 
+		LUTHelper(root->right, arr, top + 1, &(*LUT)); 
+	} 
+	if (isLeaf(root)) {
+		for(int i = 0; i < top; i++){
+			char buf[1];
+			itoa(arr[i], buf, 10);
+			(*LUT)[(unsigned int)root->data][i] = buf[0];
+		}
+		// IT'S IMPORTANT TO BE TIDY DAMMIT
+		(*LUT)[(unsigned int)root->data][top] = '\0';
+	} 
+}
+
+char** createLUT(struct MinHeapNode* root){
+	char** LUT;
+	LUT = malloc(sizeof(char*)*256);
+	for(int i = 0; i < 256; i++){
+		LUT[i] = malloc(sizeof(char)*50);
+		strcpy(LUT[i], "N");
+	}
+
+	int arr[MAX_TREE_HT], top = 0; 
+	LUTHelper(root, arr, top, &LUT);
+	return LUT;
+}
 
 // The main function that builds a 
 // Huffman Tree and print codes by traversing 
@@ -346,9 +381,6 @@ void deserializeHelper(struct MinHeapNode** root, int* array, int size, int* ind
 	}
 
 	*root = newNode(data, freq);
-	if(*index == 3){
-		printf("First address: %p \n", *root);
-	}
 	deserializeHelper(&((*root)->left), array, size, index);
 	deserializeHelper(&((*root)->right), array, size, index);
 }
@@ -357,8 +389,6 @@ void deserializeHelper(struct MinHeapNode** root, int* array, int size, int* ind
 struct MinHeapNode* deserialize(int* array, int size){
 	int index = 0;
 	struct MinHeapNode* root;
-	printf("Adress before helper: %p \n", root);
 	deserializeHelper(&root, array, size, &index);
-	printf("Adress after helper: %p \n", root);
 	return root;
 }

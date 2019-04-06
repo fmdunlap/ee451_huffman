@@ -18,6 +18,7 @@ char* readIntoMemory(char* filename){
     fileBuffer = (unsigned char*)malloc((length+1)*sizeof(unsigned char));
     length = fread(fileBuffer, sizeof(unsigned char), length, fileToCompress);
     printf("Read %d bytes.\n", length);
+    fclose(fileToCompress);
     return fileBuffer;
 }
 
