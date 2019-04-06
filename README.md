@@ -8,22 +8,6 @@ Take a peak at the instructions below on how to build. I've already put some of 
 
 Source: I just modified an excellent template (https://github.com/kigster/cmake-project-template)
 
-## TODO
-* fileio.c
-  * ~file input~
-* parallel.c
-  * ~scatter relevant chunks~
-  * ~per thread statistical analysis on recieved chunks~
-  * ~master.gather_statistical_data~
-  * ~master.compute_analytics~
-  * ~master.serialize_analytics~
-  * ~broadcast serialized analytics~
-  * ~per thread deserialize analytics~
-  * _compress_
-    * In this case, that means actually taking the bytes from the original file, and transforming them into to huffman bytes via some bitstream mechanism.
-  * master.gather_chunks
-  * master.writeToDisk
-
 ## Usage
 
 ### Prerequisites
@@ -65,11 +49,26 @@ Options:
 ./run.sh [-n/--numprocs] <num_procs> [-t/--type] <s or p> [-o/--output] <./out/file/location> [-s/--srun] ./fileToCompress
 ```
 
-
 ## File Locations
 
  * `src/*` — C++ code that ultimately compiles into a library
  * `bin/`, `lib`, `include` are all empty directories, until the `make install` install the project artifacts there.
+ 
+## TODO
+* fileio.c
+  * ~file input~
+* parallel.c
+  * ~scatter relevant chunks~
+  * ~per thread statistical analysis on recieved chunks~
+  * ~master.gather_statistical_data~
+  * ~master.compute_analytics~
+  * ~master.serialize_analytics~
+  * ~broadcast serialized analytics~
+  * ~per thread deserialize analytics~
+  * _compress_
+    * In this case, that means actually taking the bytes from the original file, and transforming them into to huffman bytes via some bitstream mechanism.
+  * master.gather_chunks
+  * master.writeToDisk
 
 ### Acknowledgements
 
