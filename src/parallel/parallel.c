@@ -8,19 +8,19 @@
 #define SHOW_OCCURRENCES false
 #define SHOW_CODES false
 #define SHOW_DESERIALIZATION false
-#define SHOW_LUT true
+#define SHOW_LUT false
 
 int bytesInBuffer = 0;
 unsigned char bitBuffer = 0;
 int bitsInBuffer = 0;
+int flushedZeros = 0;
 
 
 
 // Buffer one binary digit ('1' or '0')
-void writeBitCharToOutput(char bitChar, char* buffer){
+void writeBitCharToOutput(char bitChar, unsigned char* buffer){
     if (bitsInBuffer > 7){
         buffer[bytesInBuffer] = bitBuffer;
-        printf("Wrote: %c to buffer\n", bitBuffer);
         bitsInBuffer = 0;
         bitBuffer = 0; // just to be tidy
         bytesInBuffer++;
@@ -30,7 +30,7 @@ void writeBitCharToOutput(char bitChar, char* buffer){
     bitsInBuffer++;
 }
 
-void writeBitStringToOutput(char* bitStr, char* buffer){
+void writeBitStringToOutput(char* bitStr, unsigned char* buffer){
     int index = 0;
     char c = bitStr[index];
     while(c != '\0'){
@@ -42,10 +42,11 @@ void writeBitStringToOutput(char* bitStr, char* buffer){
 
 // Call after last character has been encoded
 // to flush out remaining bits
-void flushBitBuffer(char* buffer){
+void flushBitBuffer(unsigned char* buffer){
     if (bitsInBuffer > 0){
         do {
             writeBitCharToOutput('0', buffer); // pad with zeroes
+            flushedZeros++;
         } while (bitsInBuffer != 1);
     }
 }
@@ -213,50 +214,91 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }
-    
-    // Now we have the codes (in an LUT and everything!), so we can start compressing
-    // our block.
 
-    int chunkSize = 64;
-    char* buffer = malloc(sizeof(char)*chunkSize);
-    int recvIndex = 0;
-    while(bytesInBuffer < chunkSize){
-        char* bitString;
-        bitString = LUT[(unsigned int)scatterRecv[recvIndex]];
-        writeBitStringToOutput(bitString, buffer);
-        recvIndex++;
+    int chunkSize = 512;
+    char* chunkBuff = malloc(sizeof(char)*chunkSize);
+    //All but the last chunk. We can be almost certain that it's not going to divide evenly
+    for(int i = 0; i < (sendCounts[rank]/chunkSize); i++){
+        for(int j = 0; j < chunkSize; j++){
+            chunkBuff[j] = scatterRecv[(i*chunkSize)+j];
+        }
+        for(int j = 0; j < chunkSize; j++){
+            writeBitStringToOutput(LUT[chunkBuff[j]], scatterRecv);
+        }
     }
-    
-    if(rank == MASTER_RANK){
-        FILE *fp;
-
-        fp = fopen("./test", "w+");
-        fprintf(fp, buffer);
-        fclose(fp);
+    int startIdx = (((int)(sendCounts[rank]/chunkSize))*chunkSize);
+    chunkSize = sendCounts[rank] - startIdx;
+    for(int j = 0; j < chunkSize; j++){
+        chunkBuff[j] = scatterRecv[startIdx + j];
     }
+    for(int j = 0; j < chunkSize; j++){
+        writeBitCharToOutput(chunkBuff[j], scatterRecv);
+    }
+    flushBitBuffer(scatterRecv);
+    free(chunkBuff);
 
-    // char* buffer = malloc(sizeof(char)*chunkSize);
-    // size_t bufferSize = 0;
-    // FILE* myEncodedStream = open_memstream(&buffer, &bufferSize);
-    // for(long int i = 0; (i < sendCounts[rank]) && i < chunkSize; i++){
-    //     char* bitString;
-    //     bitString = LUT[(unsigned int)scatterRecv[i]];
-    //     writeBitStringToOutput(bitString, myEncodedStream);
-    // }
-    // flushBitBuffer(myEncodedStream);
-    // fclose(myEncodedStream);    //This will set buffer and bufferSize.
-    // printf("Rank %d's encoded buffer is of size: %li\n", rank, bufferSize);
-    // if(rank == 1){
-    //     for(int i = 0; i < bufferSize; i++){
-    //         printf("%c", (char) buffer[i]);
-    //     }
-    //     printf("\n");
-    // }
-    // free(buffer);
+    if(rank != MASTER_RANK){
+        // Send your compressed metadata and shit to the master.
+        MPI_Send(&bytesInBuffer, 1, MPI_LONG_INT, MASTER_RANK, rank, MPI_COMM_WORLD);
+        MPI_Send(&flushedZeros, 1, MPI_LONG_INT, MASTER_RANK, rank, MPI_COMM_WORLD);
+        MPI_Send(scatterRecv, bytesInBuffer, MPI_UNSIGNED_CHAR, MASTER_RANK, rank, MPI_COMM_WORLD);
+        // Free that shit stat.
+        // free(scatterRecv);
+    } else {
+        FILE* out = fopen(getCompressedName(inputFileName), "w+");
+        long int* bufferSizes = malloc(sizeof(long int)*numProcs);
+        long int* numFlushedZeros = malloc(sizeof(long int)*numProcs);
+        bufferSizes[0] = bytesInBuffer;
+        numFlushedZeros[0] = flushedZeros;
 
-    // TODO: Encode the original file bytes
-    // TODO: send blocks to master
-    // TODO: merge blocks -- this is going to be tricky.
+        // Get header info from each non-master process.
+        for(int i = 1; i < numProcs; i++){
+            MPI_Recv(&bufferSizes[i], 1, MPI_LONG_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&numFlushedZeros[i], 1, MPI_LONG_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            printf("Master received bufferSize: %li and numFlushedZeros: %li from %d\n", bufferSizes[i], numFlushedZeros[i], i);
+        }
+        
+        // write file header with relevant info
+            // Serialized huffman
+            // Chunk locations & num zeros.
+            // ???
+        fprintf(out, "-\n");
+        for(int i = 0; i < numProcs; i++){ 
+            fprintf(out, "%d\n", bufferSizes[i]);
+        }
+        fprintf(out, "--\n");
+        for(int i = 0; i < numProcs; i++){
+            fprintf(out, "%d\n", numFlushedZeros[i]);
+        }
+        fprintf(out, "---\n");
+        for(int i = 0; i < numProcs; i++){
+            unsigned char* comp;
+            if(i != MASTER_RANK){
+                comp = (unsigned char*)malloc(sizeof(unsigned char)*bufferSizes[i]);
+                printf("Attempting to allocate %li bytes of mem.\n", bufferSizes[i]);
+
+                printf("Receiving compressed from proc %d.\n", i);
+                MPI_Recv(comp, bufferSizes[i], MPI_UNSIGNED_CHAR, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                printf("Received compressed from proc %d.\n", i);
+            } else {
+                printf("Exporting master contents.\n");                
+                comp = scatterRecv;
+            }
+            for(int j = 0; j < bufferSizes[i]; j++){
+                fprintf(out, "%c", comp[j]);
+            }
+            printf("Exported compressed contents of proc %d.\n", i);    
+            free(comp);
+        }
+            // if !master_rank
+                // recv compressed info
+            // else 
+                // stage master compressed info
+            // write rank's compressed shit to file.
+        //close file
+        fclose(out);
+    }
+    // merge blocks -- this is going to be tricky.
     // Current thought is to write the info to the file header, where we store the 
     // serialized tree/LUT. Logic as follows
         // Proc gets to end of encoding sequence and has x bits left in a byte
@@ -274,6 +316,4 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
 
         // On decompress, it removes those 'n' bits from the byte while
         // doing the huffman decode.
-    // TODO: Flush blocks to disk.
-
 }

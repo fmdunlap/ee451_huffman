@@ -4,4 +4,5 @@
     char* readIntoMemory(char* filename);
     static long length;
     long getLength();
+    char* getCompressedName(char* filename);
 #endif

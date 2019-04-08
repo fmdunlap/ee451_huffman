@@ -1,6 +1,7 @@
 #include "fileio.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 char* readIntoMemory(char* filename){
     FILE * fileToCompress;
@@ -24,4 +25,18 @@ char* readIntoMemory(char* filename){
 
 long getLength(){
     return length;
+}
+
+char* getCompressedName(char* filename){
+    char* compressedName = malloc(sizeof(char*)*sizeof(filename) + 3); // worst case we need 3 more characters for our file ending
+    strcpy(compressedName, filename);
+    char* dotSpot = strrchr(compressedName, '.');
+    if(dotSpot == NULL){
+        strcat(compressedName, ".drk");
+    } else {
+        *(dotSpot+1) = 'd';
+        *(dotSpot+2) = 'r';
+        *(dotSpot+3) = 'k';
+    }
+    return compressedName;
 }
