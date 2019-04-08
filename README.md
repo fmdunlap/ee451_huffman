@@ -55,6 +55,8 @@ Options:
  * `bin/`, `lib`, `include` are all empty directories, until the `make install` install the project artifacts there.
  
 ## TODO
+
+### Milestones
 * fileio.c
   * ~file input~
 * parallel.c
@@ -65,10 +67,14 @@ Options:
   * ~master.serialize_analytics~
   * ~broadcast serialized analytics~
   * ~per thread deserialize analytics~
-  * _compress_
+  * ~_compress_~
     * In this case, that means actually taking the bytes from the original file, and transforming them into to huffman bytes via some bitstream mechanism.
-  * master.gather_chunks
-  * master.writeToDisk
+  * ~master.gather_chunks~
+  * ~master.writeToDisk~
+
+### Known bugs
+* Bug in the encoding pipeline.
+  * If the encoded file grows faster than we're consuming data from the recieved bits, we're overflowing. Was having an issue with malllocs at the time. This is around parallel.c[229]
 
 ### Acknowledgements
 
