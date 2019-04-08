@@ -15,8 +15,6 @@ unsigned char bitBuffer = 0;
 int bitsInBuffer = 0;
 int flushedZeros = 0;
 
-
-
 // Buffer one binary digit ('1' or '0')
 void writeBitCharToOutput(char bitChar, unsigned char* buffer){
     if (bitsInBuffer > 7){
@@ -102,16 +100,21 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     int sendCounts[numProcs];
     int displacement[numProcs];
 
-    for(int i = 0; i < numProcs-1; i++){
-        sendCounts[i] = bytesPerProc;
-        if(i != 0){
-            displacement[i] = displacement[i-1] + bytesPerProc;
-        } else {
-            displacement[i] = 0;
+    if(numProcs > 1){
+        for(int i = 0; i < numProcs-1; i++){
+            sendCounts[i] = bytesPerProc;
+            if(i != 0){
+                displacement[i] = displacement[i-1] + bytesPerProc;
+            } else {
+                displacement[i] = 0;
+            }
         }
+        sendCounts[numProcs-1] = numBytes - bytesPerProc*(numProcs-1);
+        displacement[numProcs-1] = displacement[numProcs-2] + bytesPerProc;
+    } else {
+        sendCounts[0] = numBytes;
+        displacement[0] = 0;
     }
-    sendCounts[numProcs-1] = numBytes - bytesPerProc*(numProcs-1);
-    displacement[numProcs-1] = displacement[numProcs-2] + bytesPerProc;
 
     unsigned char* scatterRecv = malloc(sendCounts[rank]*sizeof(unsigned char));
 
@@ -290,14 +293,9 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
             printf("Exported compressed contents of proc %d.\n", i);    
             free(comp);
         }
-            // if !master_rank
-                // recv compressed info
-            // else 
-                // stage master compressed info
-            // write rank's compressed shit to file.
-        //close file
         fclose(out);
     }
+
     // merge blocks -- this is going to be tricky.
     // Current thought is to write the info to the file header, where we store the 
     // serialized tree/LUT. Logic as follows

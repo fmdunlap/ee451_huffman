@@ -65,7 +65,7 @@ bin/lib-bash
 .lib-bash
 testfiles
 hex
-test
+test*
 
 # vscode settings
 .vscode
