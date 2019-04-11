@@ -8,6 +8,9 @@
 int serialSize;
 int* serialized;
 
+int myRank;
+
+void dprint(char* msg);
 void standardParallelSubroutine(int rank, int numProcs, char* inputFileName);
 struct MinHeapNode* buildHuffmanTreeFromOccurrences(int* occurrences);
 

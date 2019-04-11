@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 
 // Debug constants
+#define SHOW_VERBOSE_MESSAGES true
 #define SHOW_OCCURRENCES false
 #define SHOW_CODES false
 #define SHOW_DESERIALIZATION false
@@ -49,6 +50,11 @@ void flushBitBuffer(unsigned char* buffer){
     }
 }
 
+void dprint(char* msg){
+    if(SHOW_VERBOSE_MESSAGES)
+        printf("%d: %s\n", myRank, msg);
+}
+
 void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     /* psuedocode:
         if(master){
@@ -63,9 +69,9 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         }
         broadcast serialized analytics
         deserialize analytics
-        ~compress~ // TODO
-        master.gather chunks // TODO
-        master.writeToDisk // TODO
+        ~compress~
+        master.gather chunks
+        master.writeToDisk
     */
 
     // Setup relevent variables.
@@ -82,9 +88,11 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     }
     unsigned char* bigFile = NULL;
     long numBytes;
+    myRank = rank;
 
     // "You may sit on this council, but you are not granted the rank of master."
-    if(rank == MASTER_RANK){
+    if(myRank == MASTER_RANK){
+        dprint("Master reading file into memory.");
         bigFile = readIntoMemory(inputFileName);
         numBytes = getLength();
     }
@@ -100,6 +108,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     int sendCounts[numProcs];
     int displacement[numProcs];
 
+    dprint("Calculating send counts and displacement.");
     if(numProcs > 1){
         for(int i = 0; i < numProcs-1; i++){
             sendCounts[i] = bytesPerProc;
@@ -116,26 +125,32 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         displacement[0] = 0;
     }
 
-    unsigned char* scatterRecv = malloc(sendCounts[rank]*sizeof(unsigned char));
+    unsigned char* scatterRecv = malloc(sendCounts[myRank]*sizeof(unsigned char));
 
+    dprint("Scattering raw file.");
     MPI_Scatterv(bigFile, sendCounts, displacement, MPI_UNSIGNED_CHAR, 
-                scatterRecv, sendCounts[rank], MPI_UNSIGNED_CHAR, MASTER_RANK,
+                scatterRecv, sendCounts[myRank], MPI_UNSIGNED_CHAR, MASTER_RANK,
                 MPI_COMM_WORLD);
 
-    if(rank == MASTER_RANK){
+    if(myRank == MASTER_RANK){
         free(bigFile);
+        dprint("File memory freed.");
     }
 
-    for(long int i = 0; i < sendCounts[rank]; i++){
-        occurrence[(unsigned char)scatterRecv[i]]++;
+    dprint("Counting character occurrences.");
+    for(long int i = 0; i < sendCounts[myRank]; i++){
+        occurrence[(unsigned int)scatterRecv[i]]++;
     }
 
+    
+    dprint("Reducing character occurrences to master.");
     //MPI_UNSIGNED_LONG worked where unsigned char and int didn't?? Weird MPI things I suppose.
     MPI_Reduce(occurrence, masterOccurrences, 256, MPI_UNSIGNED_LONG, MPI_SUM, MASTER_RANK, MPI_COMM_WORLD);
 
     //Now that we have the occurrences, let's clean them up a bit.
     //How many of the values are non zero? These are small quick ops, so no mind that they're done serially.
-    if(rank==MASTER_RANK){
+    if(myRank==MASTER_RANK){
+        dprint("Master building huffman tree.");
         struct MinHeap* minHeap = NULL;
         struct MinHeapNode* huffmanRoot = NULL;
         int dataSize = 0;
@@ -150,7 +165,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         char* data = malloc(sizeof(int)*dataSize);
         int j = 0;
         if(SHOW_OCCURRENCES){
-            printf("------------- RANK %d OCCURRENCES BEFORE BUILDING TREE -------------\n", rank);
+            dprint("------------- OCCURRENCES BEFORE BUILDING TREE -------------\n");
         }
         for(int i = 0; i < 256; i++){
             if(masterOccurrences[i] != 0){
@@ -167,7 +182,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         huffmanRoot = buildHuffmanTree(data, freq, dataSize, minHeap);
         if(SHOW_CODES){
             int arr[MAX_TREE_HT], top = 0; 
-            printf("------------- RANK %d CODES BEFORE SERIALIZATION -------------\n", rank);
+            dprint("------------- CODES BEFORE SERIALIZATION -------------\n");
 	        printCodes(huffmanRoot, arr, top); 
         }
 
@@ -180,20 +195,23 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         // Now we have a serialized huffman tree to send out to all of the nodes! Hooray!
         // We can also use this serialization to store the tree in the file later.
     }
+    
     if(SHOW_CODES || SHOW_OCCURRENCES){
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
+    dprint("Broadcasting serialized huffman tree size.");
     MPI_Bcast(&serialSize, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
-    if(rank != MASTER_RANK){
+    if(myRank != MASTER_RANK){
         serialized = malloc(sizeof(int)*serialSize);
     }
 
+    dprint("Broadcasting serialized huffman tree.");
     MPI_Bcast(serialized, serialSize, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
     struct MinHeapNode* localRoot = deserialize(serialized, serialSize);
     if(SHOW_DESERIALIZATION){
-        if(rank == 1){
-            printf("------------- RANK %d DESERIALIZED HUFFMAN TREE -------------\n", rank);
+        if(myRank == 1){
+            dprint("------------- DESERIALIZED HUFFMAN TREE -------------\n");
             int arr[MAX_TREE_HT], top = 0;
             printCodes(localRoot, arr, top); 
         }
@@ -204,13 +222,10 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     // deserialzing the tree and instead just sending each proc an LUT.
     // It's extremely valid. Going to leave serialization in for now since 
     // it doesn't take much processing. Really, though, it's just for the LUT...
-    if(rank == MASTER_RANK){
-        printf("LUT\n");
-    }
     char** LUT = createLUT(localRoot);
     if(SHOW_LUT){
-        if(rank == 1){
-            printf("------------- RANK %d LUT -------------\n", rank);
+        if(myRank == 1){
+            dprint("------------- LUT -------------\n");
             for(int i = 0; i < 256; i++){
                 printf("%c: %s\n", (char) i, LUT[i]);
             }
@@ -218,33 +233,39 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
-    int chunkSize = 512;
-    char* chunkBuff = malloc(sizeof(char)*chunkSize);
+    int chunkSize = 4096;
+    unsigned char* compressed = malloc(sizeof(unsigned char)*numBytes);
+    dprint("Allocated compressed file.");
+    unsigned char* chunkBuff = malloc(sizeof(unsigned char)*chunkSize);
+    dprint("Allocated chunk buff.");
+    MPI_Barrier(MPI_COMM_WORLD);
     //All but the last chunk. We can be almost certain that it's not going to divide evenly
-    for(int i = 0; i < (sendCounts[rank]/chunkSize); i++){
+    for(int i = 0; i < (sendCounts[myRank]/chunkSize); i++){
         for(int j = 0; j < chunkSize; j++){
             chunkBuff[j] = scatterRecv[(i*chunkSize)+j];
         }
         for(int j = 0; j < chunkSize; j++){
-            writeBitStringToOutput(LUT[chunkBuff[j]], scatterRecv);
+            writeBitStringToOutput(LUT[(unsigned int)chunkBuff[j]], compressed);
         }
     }
-    int startIdx = (((int)(sendCounts[rank]/chunkSize))*chunkSize);
-    chunkSize = sendCounts[rank] - startIdx;
+    dprint("Calculating start index.");
+    int startIdx = (((int)(sendCounts[myRank]/chunkSize))*chunkSize);
+    chunkSize = sendCounts[myRank] - startIdx;
     for(int j = 0; j < chunkSize; j++){
         chunkBuff[j] = scatterRecv[startIdx + j];
     }
     for(int j = 0; j < chunkSize; j++){
-        writeBitCharToOutput(chunkBuff[j], scatterRecv);
+        writeBitCharToOutput(chunkBuff[j], compressed);
     }
-    flushBitBuffer(scatterRecv);
+    flushBitBuffer(compressed);
+    free(scatterRecv);
     free(chunkBuff);
 
-    if(rank != MASTER_RANK){
+    if(myRank != MASTER_RANK){
         // Send your compressed metadata and shit to the master.
-        MPI_Send(&bytesInBuffer, 1, MPI_LONG_INT, MASTER_RANK, rank, MPI_COMM_WORLD);
-        MPI_Send(&flushedZeros, 1, MPI_LONG_INT, MASTER_RANK, rank, MPI_COMM_WORLD);
-        MPI_Send(scatterRecv, bytesInBuffer, MPI_UNSIGNED_CHAR, MASTER_RANK, rank, MPI_COMM_WORLD);
+        MPI_Send(&bytesInBuffer, 1, MPI_LONG_INT, MASTER_RANK, myRank, MPI_COMM_WORLD);
+        MPI_Send(&flushedZeros, 1, MPI_LONG_INT, MASTER_RANK, myRank, MPI_COMM_WORLD);
+        MPI_Send(compressed, bytesInBuffer, MPI_UNSIGNED_CHAR, MASTER_RANK, myRank, MPI_COMM_WORLD);
         // Free that shit stat.
         // free(scatterRecv);
     } else {
@@ -285,12 +306,13 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
                 printf("Received compressed from proc %d.\n", i);
             } else {
                 printf("Exporting master contents.\n");                
-                comp = scatterRecv;
+                comp = compressed;
             }
             for(int j = 0; j < bufferSizes[i]; j++){
                 fprintf(out, "%c", comp[j]);
             }
-            printf("Exported compressed contents of proc %d.\n", i);    
+            dprint("Exported compressed contents of proc.");
+            dprint("Freeing comp.");
             free(comp);
         }
         fclose(out);
