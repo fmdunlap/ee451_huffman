@@ -71,6 +71,10 @@ Options:
     * In this case, that means actually taking the bytes from the original file, and transforming them into to huffman bytes via some bitstream mechanism.
   * ~master.gather_chunks~
   * ~master.writeToDisk~
+  
+## Questions Doc
+
+https://docs.google.com/document/d/1oiq61ZmepcOkQvj9xyXiyFsXD8xLtkFmV9CVx3HahYs/edit?usp=sharing
 
 ### Known bugs
 * Bug in the encoding pipeline.
