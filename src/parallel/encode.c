@@ -1,15 +1,15 @@
-#include "./parallel.h"
+#include "./encode.h"
 #include "../huffbuild/huffbuild.h"
 #include "../fileio/fileio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 
 // Debug constants
-#define SHOW_VERBOSE_MESSAGES true
-#define SHOW_OCCURRENCES false
-#define SHOW_CODES false
-#define SHOW_DESERIALIZATION false
-#define SHOW_LUT false
+#define ENCODE_SHOW_VERBOSE_MESSAGES false
+#define ENCODE_SHOW_OCCURRENCES false
+#define ENCODE_SHOW_CODES false
+#define ENCODE_SHOW_DESERIALIZATION false
+#define ENCODE_SHOW_LUT false
 
 int bytesInBuffer = 0;
 unsigned char bitBuffer = 0;
@@ -50,12 +50,12 @@ void flushBitBuffer(unsigned char* buffer){
     }
 }
 
-void dprint(char* msg){
-    if(SHOW_VERBOSE_MESSAGES)
+static void dprint(char* msg){
+    if(ENCODE_SHOW_VERBOSE_MESSAGES)
         printf("%d: %s\n", myRank, msg);
 }
 
-void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
+void parallelEncode(int rank, int numProcs, char* inputFileName){
     /* psuedocode:
         if(master){
             readInFile()
@@ -164,7 +164,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         int* freq = malloc(sizeof(int)*dataSize);
         char* data = malloc(sizeof(int)*dataSize);
         int j = 0;
-        if(SHOW_OCCURRENCES){
+        if(ENCODE_SHOW_OCCURRENCES){
             dprint("------------- OCCURRENCES BEFORE BUILDING TREE -------------\n");
         }
         for(int i = 0; i < 256; i++){
@@ -172,7 +172,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
                 freq[j] = masterOccurrences[i];
                 data[j] = (char)i;
                 j++;
-                if(SHOW_OCCURRENCES){
+                if(ENCODE_SHOW_OCCURRENCES){
                     printf("%c: %ld\n",(char)i, masterOccurrences[i]);
                 }
             }
@@ -180,7 +180,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         
         //Build the tree and get the root.
         huffmanRoot = buildHuffmanTree(data, freq, dataSize, minHeap);
-        if(SHOW_CODES){
+        if(ENCODE_SHOW_CODES){
             int arr[MAX_TREE_HT], top = 0; 
             dprint("------------- CODES BEFORE SERIALIZATION -------------\n");
 	        printCodes(huffmanRoot, arr, top); 
@@ -196,7 +196,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
         // We can also use this serialization to store the tree in the file later.
     }
     
-    if(SHOW_CODES || SHOW_OCCURRENCES){
+    if(ENCODE_SHOW_CODES || ENCODE_SHOW_OCCURRENCES){
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
@@ -209,7 +209,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     dprint("Broadcasting serialized huffman tree.");
     MPI_Bcast(serialized, serialSize, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
     struct MinHeapNode* localRoot = deserialize(serialized, serialSize);
-    if(SHOW_DESERIALIZATION){
+    if(ENCODE_SHOW_DESERIALIZATION){
         if(myRank == 1){
             dprint("------------- DESERIALIZED HUFFMAN TREE -------------\n");
             int arr[MAX_TREE_HT], top = 0;
@@ -223,7 +223,7 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
     // It's extremely valid. Going to leave serialization in for now since 
     // it doesn't take much processing. Really, though, it's just for the LUT...
     char** LUT = createLUT(localRoot);
-    if(SHOW_LUT){
+    if(ENCODE_SHOW_LUT){
         if(myRank == 1){
             dprint("------------- LUT -------------\n");
             for(int i = 0; i < 256; i++){
@@ -286,15 +286,22 @@ void standardParallelSubroutine(int rank, int numProcs, char* inputFileName){
             // Serialized huffman
             // Chunk locations & num zeros.
             // ???
+        fprintf(out, "%d\n", numProcs);
         fprintf(out, "-\n");
-        for(int i = 0; i < numProcs; i++){ 
-            fprintf(out, "%d\n", bufferSizes[i]);
-        }
-        fprintf(out, "--\n");
         for(int i = 0; i < numProcs; i++){
-            fprintf(out, "%d\n", numFlushedZeros[i]);
+            fprintf(out, "%li\n", bufferSizes[i]);
         }
-        fprintf(out, "---\n");
+        fprintf(out, "-\n");
+        for(int i = 0; i < numProcs; i++){
+            fprintf(out, "%li\n", numFlushedZeros[i]);
+        }
+        fprintf(out, "-\n");
+        fprintf(out, "%d\n", serialSize);
+        for(int i = 0; i < serialSize - 1; i++){
+            fprintf(out, "%d,",serialized[i]);
+        }
+        fprintf(out, "%d\n", serialized[serialSize - 1]);
+        fprintf(out, "-\n");
         for(int i = 0; i < numProcs; i++){
             unsigned char* comp;
             if(i != MASTER_RANK){

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-char* readIntoMemory(char* filename){
+unsigned char* readIntoMemory(char* filename){
     FILE * fileToCompress;
     unsigned char *fileBuffer;
 
@@ -13,12 +13,12 @@ char* readIntoMemory(char* filename){
     // byte offset, and then rewinding to the beginning.
     fseek(fileToCompress, 0, SEEK_END);
     length = ftell(fileToCompress);
-    printf("File is of length: %i\n", length);
+    printf("File is of length: %li\n", length);
     rewind(fileToCompress);
 
     fileBuffer = (unsigned char*)malloc((length+1)*sizeof(unsigned char));
     length = fread(fileBuffer, sizeof(unsigned char), length, fileToCompress);
-    printf("Read %d bytes.\n", length);
+    printf("Read %li bytes.\n", length);
     fclose(fileToCompress);
     return fileBuffer;
 }

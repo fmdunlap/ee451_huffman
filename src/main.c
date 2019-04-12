@@ -1,5 +1,6 @@
 #include "main.h"
-#include "./parallel/parallel.h"
+#include "./parallel/encode.h"
+#include "./parallel/decode.h"
 #include <string.h>
 #include <mpi.h>
 
@@ -11,7 +12,11 @@ int main(int argc, char *argv[]) {
     setupMpiVars();
 
     if(runType == TYPE_PARALLEL){
-        standardParallelSubroutine(rank, numProcs, inputFileName);
+        if(EndsWith(inputFileName, ".drk")){
+            parallelDecode(rank, numProcs, inputFileName);
+        } else {
+            parallelEncode(rank, numProcs, inputFileName);
+        }
     }
 
     MPI_Finalize();

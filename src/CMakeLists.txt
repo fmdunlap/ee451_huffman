@@ -7,8 +7,10 @@ SET(SOURCE_FILES
   ./util.h
   ./fileio/fileio.h
   ./fileio/fileio.c
-  ./parallel/parallel.h
-  ./parallel/parallel.c  
+  ./parallel/encode.h
+  ./parallel/encode.c  
+  ./parallel/decode.h
+  ./parallel/decode.c  
   ./hashmap/hashmap.h 
   ./hashmap/hashmap.c 
   ./huffbuild/huffbuild.h
