@@ -180,7 +180,7 @@ void parallelDecode(int rank, int nProcs, char* fName){
         ## Decode Pseudocode ##
         MASTER:
             X Read file in
-            X Compile header data & broadcast
+            X Compile header data
         X BCast Header Data
         TODO Scatter file to threads
         TODO Build structures/huffman tree from received header data
