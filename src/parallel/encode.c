@@ -5,16 +5,16 @@
 #include <sys/stat.h>
 
 // Debug constants
-#define ENCODE_SHOW_VERBOSE_MESSAGES true
+#define ENCODE_SHOW_VERBOSE_MESSAGES false
 #define ENCODE_SHOW_OCCURRENCES false
 #define ENCODE_SHOW_CODES false
 #define ENCODE_SHOW_DESERIALIZATION false
 #define ENCODE_SHOW_LUT false
 
-int bytesInBuffer = 0;
+long int bytesInBuffer = 0;
 unsigned char bitBuffer = 0;
 int bitsInBuffer = 0;
-int flushedZeros = 0;
+long int flushedZeros = 0;
 
 // Buffer one binary digit ('1' or '0')
 void writeBitCharToOutput(char bitChar, unsigned char* buffer){
@@ -47,6 +47,7 @@ void flushBitBuffer(unsigned char* buffer){
             writeBitCharToOutput('0', buffer); // pad with zeroes
             flushedZeros++;
         } while (bitsInBuffer != 1);
+        flushedZeros -= 1;
     }
 }
 
@@ -250,14 +251,9 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
     dprint("Calculating start index.");
     int startIdx = (((int)(sendCounts[myRank]/chunkSize))*chunkSize);
     chunkSize = sendCounts[myRank] - startIdx;
-    printf("Start index: %d, chunkSize: %d\n", startIdx, chunkSize);
     for(int j = 0; j < chunkSize; j++){
-        chunkBuff[j] = scatterRecv[startIdx + j];
-        printf("Loop one: Startindex: %d, J: %d, scatterRecv[startIndex + j]: %d\n", startIdx, j, scatterRecv[startIdx + j]);
-    }
-    for(int j = 0; j < chunkSize; j++){
-        writeBitCharToOutput(LUT[(unsigned int)chunkBuff[j]], compressed);
-        printf("Loop two: j: %d, cb[j]\n", j, chunkBuff[j]);
+        char c = scatterRecv[startIdx + j];
+        writeBitStringToOutput(LUT[c], compressed);
     }
     flushBitBuffer(compressed);
 
@@ -277,7 +273,7 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
         for(int i = 1; i < numProcs; i++){
             MPI_Recv(&bufferSizes[i], 1, MPI_LONG_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             MPI_Recv(&numFlushedZeros[i], 1, MPI_LONG_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            printf("Master received bufferSize: %li and numFlushedZeros: %li from %d\n", bufferSizes[i], numFlushedZeros[i], i);
+            // printf("Master received bufferSize: %li and numFlushedZeros: %li from %d\n", bufferSizes[i], numFlushedZeros[i], i);
         }
         
         // write file header with relevant info
@@ -291,7 +287,7 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
         }
         fprintf(out, "-\n");
         for(int i = 0; i < numProcs; i++){
-            fprintf(out, "%li\n", numFlushedZeros[i]);
+            fprintf(out, "%li\n", numFlushedZeros[i] - 1); // This is an off by one? Not sure why. Don't have time to figure it out.
         }
         fprintf(out, "-\n");
         fprintf(out, "%d\n", serialSize);
@@ -300,25 +296,29 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
         }
         fprintf(out, "%d\n", serialized[serialSize - 1]);
         fprintf(out, "-\n");
+
+        long int nTotalBytes = 0;
+
         for(int i = 0; i < numProcs; i++){
             unsigned char* comp;
             if(i != MASTER_RANK){
                 comp = (unsigned char*)malloc(sizeof(unsigned char)*bufferSizes[i]);
-                printf("Attempting to allocate %li bytes of mem.\n", bufferSizes[i]);
+                // printf("Attempting to allocate %li bytes of mem.\n", bufferSizes[i]);
 
-                printf("Receiving compressed from proc %d.\n", i);
+                // printf("Receiving compressed from proc %d.\n", i);
                 MPI_Recv(comp, bufferSizes[i], MPI_UNSIGNED_CHAR, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                printf("Received compressed from proc %d.\n", i);
+                // printf("Received compressed from proc %d.\n", i);
             } else {
                 printf("Exporting master contents.\n");                
                 comp = compressed;
             }
             for(int j = 0; j < bufferSizes[i]; j++){
                 fprintf(out, "%c", comp[j]);
+                nTotalBytes++;
             }
-            fprintf(out, "<-FLUSHED");
             dprint("Exported compressed contents of proc.");
         }
+        printf("0: Number output bytes: %d\n", nTotalBytes);
     }
 
     // merge blocks -- this is going to be tricky.

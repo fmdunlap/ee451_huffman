@@ -40,3 +40,17 @@ char* getCompressedName(char* filename){
     }
     return compressedName;
 }
+
+char* getDecompressedName(char* filename){
+    char* decompressedName = malloc(sizeof(char*)*sizeof(filename) + 3); // worst case we need 3 more characters for our file ending
+    strcpy(decompressedName, filename);
+    char* dotSpot = strrchr(decompressedName, '.');
+    if(dotSpot == NULL){
+        strcat(decompressedName, ".out");
+    } else {
+        *(dotSpot+1) = 'o';
+        *(dotSpot+2) = 'u';
+        *(dotSpot+3) = 't';
+    }
+    return decompressedName;
+}

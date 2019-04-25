@@ -5,4 +5,5 @@
     static long length;
     long getLength();
     char* getCompressedName(char* filename);
+    char* getDecompressedName(char* filename);
 #endif

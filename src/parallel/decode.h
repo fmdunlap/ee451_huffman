@@ -13,6 +13,8 @@ char* inputFileName;
 int* sendCounts;
 int* displacements;
 unsigned char* scatterRecv;
+unsigned char* decoded; // Where we hold onto our decoded text. Global because I don't feel like dealing with pointers.
+long long int decodedCursor;
 
 // Communicated data
 long numBytes;
@@ -35,6 +37,7 @@ struct MinHeapNode {
 	struct MinHeapNode *left, *right; 
 };
 struct MinHeapNode* localRoot;
+struct MinHeapNode* activeRoot;
 struct MinHeapNode* decodeNewNode(char data, unsigned freq);
 void decodeDeserializeHelper(struct MinHeapNode** root, int* array, int size, int* index);
 struct MinHeapNode* decodeDeserialize(int* array, int size);

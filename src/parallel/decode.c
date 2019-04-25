@@ -6,6 +6,8 @@
 // Debug constants
 #define DECODE_SHOW_VERBOSE_MESSAGES true
 
+
+
 static void dprint(const char* fmt, ...){
     if(DECODE_SHOW_VERBOSE_MESSAGES){
         va_list args;
@@ -161,7 +163,7 @@ void calcSendCountsAndDisplacement(){
         sendCounts[numProcs-1] = numBytes - bytesPerProc*(numProcs-1) - headerDisplacement;
         displacements[numProcs-1] = displacements[numProcs-2] + bytesPerProc;
     } else {
-        sendCounts[0] = numBytes;
+        sendCounts[0] = numBytes - headerDisplacement;
         displacements[0] = headerDisplacement;
     }
     printSendAndDisplacementDebug();
@@ -179,34 +181,85 @@ void scatterFileBuffer(unsigned char* fileBuffer){
     dprint("Received chunk.");
 }
 
-bool isFlushedByte(int relativeByteIndex){
+int isFlushedByte(int relativeByteIndex){
     int absoluteByteIndex = relativeByteIndex + displacements[myRank];
     for(int i = 0; i < origProcs; i++){
-        if(absoluteByteIndex == flushedByteLocations[i]){
-            return true;
+        if(absoluteByteIndex == flushedByteLocations[i] - 1){
+            return i;
         }
     }
-    return false;
+    return -1;
 }
 
-char* decodeChunk(){
-    char* decoded = malloc(sizeof(char)*((numBytes/numProcs)*3));
-    int numBytesInBuffer = sendCounts[myRank];
-    if(myRank == numProcs - 1){
-        // If you have the last set of bytes, you need to go one byte farther to grab the last one.
-        numBytesInBuffer += 1;
+// n is the number of bits to consider starting from the right.
+// That is, this function sees 10011010, 8 as 1->0->0->1->1->0->1->0
+// and 10100111, 3 as 1->0->1
+void decodeByte(unsigned char byte, int n){
+    int bitsPerByte = 8;
+    for(int i = 0; i < n; i++){
+        int bitToCheck = 1 << (bitsPerByte - 1 - i);
+        if(byte & bitToCheck){ // if the bit at byte[bitsPerByte-1-i] == 1
+            activeRoot = activeRoot->right;
+        } else {
+            activeRoot = activeRoot->left;
+        }
+        if(isLeaf(activeRoot)){
+            decoded[decodedCursor] = (char) activeRoot->data;
+            decodedCursor++;
+            activeRoot = localRoot;
+        }
     }
+}
+
+void decodeChunk(){
+    //upper bounded guess, tbh. It's a project, not production. :|
+    decoded = malloc(sizeof(char)*((numBytes/numProcs)*3)); // Entirely arbitrary size choice. I HIGHLY doubt that this alg will get a compression factor of anywhere near 3.
+    decodedCursor = 0;
+    int numBytesInBuffer = sendCounts[myRank];
+    activeRoot = localRoot;
 
     for(int currByte = 0; currByte < numBytesInBuffer; currByte++){
-        if(isFlushedByte(currByte)){
-            dprint("I hit a flushed byte at relative %d == absolute %d. The value is: %d", currByte, currByte + displacements[myRank], scatterRecv[currByte]);
-        } else {
+        unsigned char byteVal = scatterRecv[currByte];
 
+        int flushedIndex = isFlushedByte(currByte);
+        if(flushedIndex != -1){
+            dprint("I hit a flushed byte at relative %d == absolute %d. The value is: %u", currByte, currByte + displacements[myRank], scatterRecv[currByte]);
+            decodeByte(byteVal, 8 - numFlushedBits[flushedIndex]);
+        } else {
+            decodeByte(byteVal, 8);
         }
     }
 
     dprint("I started/ended on absolute byte number: %d/%d", displacements[myRank], numBytesInBuffer - 1 + displacements[myRank]);
     
+}
+
+void receiveAndWriteChunks(char* inputFileName){
+    long int bytes = 0;
+    if(myRank != MASTER_RANK){
+        MPI_Send(&decodedCursor, 1, MPI_LONG_LONG_INT, MASTER_RANK, myRank, MPI_COMM_WORLD);
+        MPI_Send(&decoded, decodedCursor, MPI_UNSIGNED_CHAR, MASTER_RANK, myRank, MPI_COMM_WORLD);
+    } else {
+        FILE* out = fopen(getDecompressedName(inputFileName), "w+");
+        for(int i = 0; i < numProcs; i++){
+            unsigned char* decomp;
+            long long int nBytes;
+            if(i != MASTER_RANK){
+                MPI_Recv(&nBytes, 1, MPI_LONG_LONG_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                decomp = malloc(sizeof(char)*nBytes);
+                MPI_Recv(decomp, nBytes, MPI_UNSIGNED_CHAR, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            } else {
+                nBytes = decodedCursor;
+                decomp = decoded;
+            }
+            for(int j = 0; j < nBytes; j++){
+                fprintf(out, "%c", decomp[j]);
+                bytes++;
+            }
+        }
+        printf("0: Out bytes: %li", bytes);
+        fclose(out);
+    }
 }
 
 void parallelDecode(int rank, int nProcs, char* fName){
@@ -220,7 +273,7 @@ void parallelDecode(int rank, int nProcs, char* fName){
         X Scatter file to threads (? Maybe?)
         X Build structures/huffman tree from received header data
         X Allocate memory
-        TODO while(!atMyDisplacementByte){
+        X? while(!atMyDisplacementByte){
             decodeWithHuffmanTree
         }
         TODO Send Decoded chunks to master
@@ -245,9 +298,8 @@ void parallelDecode(int rank, int nProcs, char* fName){
     scatterFileBuffer(bigFile);
     localRoot = decodeDeserialize(serializedTree, serializedTreeLength);
 
-    //upper bounded guess, tbh. It's a project, not production. :|
-    char* decodedChunk = decodeChunk();
-
+    decodeChunk();
+    receiveAndWriteChunks(fName);
 
     return;
 }
