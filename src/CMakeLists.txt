@@ -5,15 +5,15 @@ project(huffman)
 SET(SOURCE_FILES 
   ./main.c
   ./util.h
+  ./huffbuild/huffbuild.h
   ./fileio/fileio.h
   ./fileio/fileio.c
   ./parallel/encode.h
-  ./parallel/encode.c  
+  ./parallel/encode.c
   ./parallel/decode.h
-  ./parallel/decode.c  
-  ./hashmap/hashmap.h 
-  ./hashmap/hashmap.c 
-  ./huffbuild/huffbuild.h
+  ./parallel/decode.c
+  ./hashmap/hashmap.h
+  ./hashmap/hashmap.c
 )
 
 SET(MPI_COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -g -Wall -Wextra")

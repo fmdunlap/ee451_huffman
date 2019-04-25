@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 
 // Debug constants
-#define ENCODE_SHOW_VERBOSE_MESSAGES false
+#define ENCODE_SHOW_VERBOSE_MESSAGES true
 #define ENCODE_SHOW_OCCURRENCES false
 #define ENCODE_SHOW_CODES false
 #define ENCODE_SHOW_DESERIALIZATION false
@@ -100,6 +100,14 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
     // First, tell everyone how many ints there will be...
     MPI_Bcast(&numBytes, 1, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
 
+    int chunkSize = 4096;
+    unsigned char* compressed;
+    compressed = calloc(numBytes, sizeof(char));
+    dprint("Allocated compressed file.");
+    unsigned char* chunkBuff;
+    chunkBuff = calloc(chunkSize, sizeof(char));
+    dprint("Allocated chunk buff.");
+
     //Some helpful bits of derived data
     // C truncates doubles when casting to int which is effectively a floor.
     long int bytesPerProc = numBytes/numProcs; 
@@ -131,11 +139,6 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
     MPI_Scatterv(bigFile, sendCounts, displacement, MPI_UNSIGNED_CHAR, 
                 scatterRecv, sendCounts[myRank], MPI_UNSIGNED_CHAR, MASTER_RANK,
                 MPI_COMM_WORLD);
-
-    if(myRank == MASTER_RANK){
-        free(bigFile);
-        dprint("File memory freed.");
-    }
 
     dprint("Counting character occurrences.");
     for(long int i = 0; i < sendCounts[myRank]; i++){
@@ -232,14 +235,10 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }
-
-    int chunkSize = 4096;
-    unsigned char* compressed = malloc(sizeof(unsigned char)*numBytes);
-    dprint("Allocated compressed file.");
-    unsigned char* chunkBuff = malloc(sizeof(unsigned char)*chunkSize);
-    dprint("Allocated chunk buff.");
     MPI_Barrier(MPI_COMM_WORLD);
     //All but the last chunk. We can be almost certain that it's not going to divide evenly
+
+    //TODO This needs to be reworked. :/
     for(int i = 0; i < (sendCounts[myRank]/chunkSize); i++){
         for(int j = 0; j < chunkSize; j++){
             chunkBuff[j] = scatterRecv[(i*chunkSize)+j];
@@ -251,23 +250,22 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
     dprint("Calculating start index.");
     int startIdx = (((int)(sendCounts[myRank]/chunkSize))*chunkSize);
     chunkSize = sendCounts[myRank] - startIdx;
+    printf("Start index: %d, chunkSize: %d\n", startIdx, chunkSize);
     for(int j = 0; j < chunkSize; j++){
         chunkBuff[j] = scatterRecv[startIdx + j];
+        printf("Loop one: Startindex: %d, J: %d, scatterRecv[startIndex + j]: %d\n", startIdx, j, scatterRecv[startIdx + j]);
     }
     for(int j = 0; j < chunkSize; j++){
-        writeBitCharToOutput(chunkBuff[j], compressed);
+        writeBitCharToOutput(LUT[(unsigned int)chunkBuff[j]], compressed);
+        printf("Loop two: j: %d, cb[j]\n", j, chunkBuff[j]);
     }
     flushBitBuffer(compressed);
-    free(scatterRecv);
-    free(chunkBuff);
 
     if(myRank != MASTER_RANK){
         // Send your compressed metadata and shit to the master.
         MPI_Send(&bytesInBuffer, 1, MPI_LONG_INT, MASTER_RANK, myRank, MPI_COMM_WORLD);
         MPI_Send(&flushedZeros, 1, MPI_LONG_INT, MASTER_RANK, myRank, MPI_COMM_WORLD);
         MPI_Send(compressed, bytesInBuffer, MPI_UNSIGNED_CHAR, MASTER_RANK, myRank, MPI_COMM_WORLD);
-        // Free that shit stat.
-        // free(scatterRecv);
     } else {
         FILE* out = fopen(getCompressedName(inputFileName), "w+");
         long int* bufferSizes = malloc(sizeof(long int)*numProcs);
@@ -318,11 +316,9 @@ void parallelEncode(int rank, int numProcs, char* inputFileName){
             for(int j = 0; j < bufferSizes[i]; j++){
                 fprintf(out, "%c", comp[j]);
             }
+            fprintf(out, "<-FLUSHED");
             dprint("Exported compressed contents of proc.");
-            dprint("Freeing comp.");
-            free(comp);
         }
-        fclose(out);
     }
 
     // merge blocks -- this is going to be tricky.

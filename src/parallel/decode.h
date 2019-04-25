@@ -20,11 +20,24 @@ int* flushedByteLocations;
 int* numFlushedBits;
 int* serializedTree;
 int serializedTreeLength;
-
-//Master Only Data
 int origProcs;
 int headerDisplacement;
 
+// Huffman Tree data (perThread)
+struct MinHeapNode { 
+	// One of the input characters 
+	unsigned char data; 
+
+	// Frequency of the character 
+	unsigned freq; 
+
+	// Left and right child of this node 
+	struct MinHeapNode *left, *right; 
+};
+struct MinHeapNode* localRoot;
+struct MinHeapNode* decodeNewNode(char data, unsigned freq);
+void decodeDeserializeHelper(struct MinHeapNode** root, int* array, int size, int* index);
+struct MinHeapNode* decodeDeserialize(int* array, int size);
 
 void parallelDecode(int rank, int numProcs, char* inputFileName);
 void readBuffLine(unsigned char* readFrom, char* buff, long int* bufferLocation);

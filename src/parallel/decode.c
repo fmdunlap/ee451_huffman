@@ -111,6 +111,8 @@ void printHeaderDebugInfo(){
 void bcastHeader(){
     MPI_Bcast(&origProcs, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
     MPI_Bcast(&serializedTreeLength, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
+    MPI_Bcast(&headerDisplacement, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
+    MPI_Bcast(&numBytes, 1, MPI_LONG, MASTER_RANK, MPI_COMM_WORLD);
 
     if(myRank != MASTER_RANK){
         flushedByteLocations = malloc(sizeof(int)*origProcs);
@@ -122,20 +124,23 @@ void bcastHeader(){
     MPI_Bcast(numFlushedBits, origProcs, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
     MPI_Bcast(serializedTree, serializedTreeLength, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
     if(myRank != MASTER_RANK){
-        printHeaderDebugInfo();
+        //printHeaderDebugInfo();
     }
 }
 
 void printSendAndDisplacementDebug(){
     if(myRank == MASTER_RANK){
-        dprint("Send counts");
-        for(int i = 0; i < numProcs; i++){
-            dprint("%d: %d", i, sendCounts[i]);
+        dprintNoFormat("%d: ", myRank);
+        dprintNoFormat("SendCounts: %d: %d", 0, sendCounts[0]);
+        for(int i = 1; i < numProcs; i++){
+            dprintNoFormat(", %d: %d", i, sendCounts[i]);
         }
-        dprint("Displacements");
-        for(int i = 0; i < numProcs; i++){
-            dprint("%d: %d", i, displacements[i]);
+        dprintNoFormat("\n");
+        dprintNoFormat("Displacement: %d: %d", 0, displacements[0]);
+        for(int i = 1; i < numProcs; i++){
+            dprintNoFormat(", %d: %d", i, displacements[i]);
         }
+        dprintNoFormat("\n");
     }
 }
 
@@ -143,7 +148,6 @@ void calcSendCountsAndDisplacement(){
     long int bytesPerProc = (numBytes-headerDisplacement)/numProcs;
     sendCounts = malloc(sizeof(int)*numProcs);
     displacements = malloc(sizeof(int)*numProcs);
-
 
     if(numProcs > 1){
         for(int i = 0; i < numProcs-1; i++){
@@ -166,12 +170,43 @@ void calcSendCountsAndDisplacement(){
 void scatterFileBuffer(unsigned char* fileBuffer){
     calcSendCountsAndDisplacement();
     scatterRecv = malloc(sendCounts[myRank]*sizeof(unsigned char));
+    dprint("Scattering raw file.");
+    printSendAndDisplacementDebug();
+    MPI_Scatterv(fileBuffer, sendCounts, displacements, MPI_UNSIGNED_CHAR, 
+                scatterRecv, sendCounts[myRank], MPI_UNSIGNED_CHAR, MASTER_RANK,
+                MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
-    // dprint("Scattering raw file.");
-    // MPI_Scatterv(fileBuffer, sendCounts, displacements, MPI_UNSIGNED_CHAR, 
-    //             scatterRecv, sendCounts[myRank], MPI_UNSIGNED_CHAR, MASTER_RANK,
-    //             MPI_COMM_WORLD);
-    // dprint("Received chunk.");
+    dprint("Received chunk.");
+}
+
+bool isFlushedByte(int relativeByteIndex){
+    int absoluteByteIndex = relativeByteIndex + displacements[myRank];
+    for(int i = 0; i < origProcs; i++){
+        if(absoluteByteIndex == flushedByteLocations[i]){
+            return true;
+        }
+    }
+    return false;
+}
+
+char* decodeChunk(){
+    char* decoded = malloc(sizeof(char)*((numBytes/numProcs)*3));
+    int numBytesInBuffer = sendCounts[myRank];
+    if(myRank == numProcs - 1){
+        // If you have the last set of bytes, you need to go one byte farther to grab the last one.
+        numBytesInBuffer += 1;
+    }
+
+    for(int currByte = 0; currByte < numBytesInBuffer; currByte++){
+        if(isFlushedByte(currByte)){
+            dprint("I hit a flushed byte at relative %d == absolute %d. The value is: %d", currByte, currByte + displacements[myRank], scatterRecv[currByte]);
+        } else {
+
+        }
+    }
+
+    dprint("I started/ended on absolute byte number: %d/%d", displacements[myRank], numBytesInBuffer - 1 + displacements[myRank]);
+    
 }
 
 void parallelDecode(int rank, int nProcs, char* fName){
@@ -182,10 +217,9 @@ void parallelDecode(int rank, int nProcs, char* fName){
             X Read file in
             X Compile header data
         X BCast Header Data
-        TODO Scatter file to threads
-        TODO Build structures/huffman tree from received header data
-        TODO Receive scattered files.
-        TODO Allocate memory
+        X Scatter file to threads (? Maybe?)
+        X Build structures/huffman tree from received header data
+        X Allocate memory
         TODO while(!atMyDisplacementByte){
             decodeWithHuffmanTree
         }
@@ -209,6 +243,11 @@ void parallelDecode(int rank, int nProcs, char* fName){
     
     bcastHeader();
     scatterFileBuffer(bigFile);
+    localRoot = decodeDeserialize(serializedTree, serializedTreeLength);
+
+    //upper bounded guess, tbh. It's a project, not production. :|
+    char* decodedChunk = decodeChunk();
+
 
     return;
 }
@@ -222,4 +261,46 @@ void readBuffLine(unsigned char* readFrom, char* buff, long int* bufferLocation)
     }
     buff[i] = '\0';
     (*bufferLocation)++;
+}
+
+// The below functions are exact replicas of the ones in huffbuild.h
+// I was having build issues/unexplained pointer issues and I got fed up.
+
+// A utility function allocate a new 
+// min heap node with given character 
+// and frequency of the character 
+struct MinHeapNode* decodeNewNode(char data, unsigned freq) 
+{ 
+	struct MinHeapNode* temp 
+		= (struct MinHeapNode*) malloc(sizeof(struct MinHeapNode)); 
+
+	temp->left = temp->right = NULL; 
+	temp->data = data; 
+	temp->freq = freq; 
+
+	return temp; 
+} 
+
+// #PointerNightmare
+void decodeDeserializeHelper(struct MinHeapNode** root, int* array, int size, int* index){
+	unsigned char data = array[*index];
+	unsigned freq = array[*index+1];
+	int null = array[*index+2];
+
+	*index += 3;
+	if(null == 1 || *index == size - 1){
+		return;
+	}
+
+	*root = decodeNewNode(data, freq);
+	decodeDeserializeHelper(&((*root)->left), array, size, index);
+	decodeDeserializeHelper(&((*root)->right), array, size, index);
+}
+
+// assumption of 3 ints per node.
+struct MinHeapNode* decodeDeserialize(int* array, int size){
+	int index = 0;
+	struct MinHeapNode* root;
+	decodeDeserializeHelper(&root, array, size, &index);
+	return root;
 }
