@@ -16,7 +16,7 @@ SET(SOURCE_FILES
   ./hashmap/hashmap.c
 )
 
-SET(MPI_COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -g -Wall -Wextra -std=c++11")
+SET(MPI_COMPILE_FLAGS "${MPI_COMPILE_FLAGS} -g -Wall -Wextra -std=gnu99")
 
 add_executable(huffman ${SOURCE_FILES})
 target_link_libraries(huffman ${MPI_LIBRARIES})
